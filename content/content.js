@@ -181,13 +181,14 @@ class SiteSwitcher {
         const addedBySteps = afterStepsCount - initialTransformedCount;
         console.log(`📊 Implementation steps complete: ${addedBySteps} new transformations (total: ${afterStepsCount})`);
 
-        // ❌ DISABLED: This was causing re-editing problems!
-        // The first round of transformations is perfect - don't mess with it!
-        console.log(`✅ Transformation complete! First round results are excellent - preserving them.`);
-        console.log(`🎯 Final result: ${afterStepsCount} elements transformed through targeted implementation steps`);
-        
-        // ORIGINAL PROBLEMATIC CODE (commented out):
-        // await this.executeRemainingTransformations(transformData);
+        // 🔥 NEW: React Site Fallback - If very few elements transformed, use direct approach
+        if (afterStepsCount < 10 && this.state.detectedElements.size > 20) {
+            console.log(`🔄 Low transformation count (${afterStepsCount}) vs detected elements (${this.state.detectedElements.size}) - activating React site fallback`);
+            await this.executeReactSiteFallback(transformData);
+        } else {
+            console.log(`✅ Transformation complete! First round results are excellent - preserving them.`);
+            console.log(`🎯 Final result: ${afterStepsCount} elements transformed through targeted implementation steps`);
+        }
     }
 
     // Execute individual transformation step
@@ -1154,6 +1155,230 @@ class SiteSwitcher {
 
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // 🔥 NEW: React Site Fallback - Direct transformation when semantic targeting fails
+    async executeReactSiteFallback(transformData) {
+        console.log('🔥 Executing React Site Fallback - Direct element transformation');
+        
+        const detectedElementsArray = Array.from(this.state.detectedElements.values());
+        let transformedCount = 0;
+        
+        // Step 1: Brand replacement with MUCH better filtering
+        console.log('🏷️ React Fallback Step 1: Smart brand replacement');
+        const brandCandidates = this.findSmartBrandElements(detectedElementsArray);
+        for (const brandElement of brandCandidates) {
+            if (!this.transformer.transformedContent.has(brandElement.element)) {
+                try {
+                    this.transformer.applyTransformation(brandElement.element, transformData.productTitle);
+                    this.transformer.transformedContent.set(brandElement.element, {
+                        originalText: brandElement.text,
+                        newText: transformData.productTitle,
+                        strategy: 'react_smart_brand_replacement',
+                        timestamp: Date.now()
+                    });
+                    transformedCount++;
+                    console.log(`✅ Smart brand replacement: "${brandElement.text.substring(0, 30)}..." → "${transformData.productTitle}"`);
+                } catch (error) {
+                    console.warn(`⚠️ Smart brand replacement failed:`, error);
+                }
+            }
+        }
+        
+        // Step 2: Transform INDIVIDUAL text elements only (not containers)
+        console.log('🎯 React Fallback Step 2: Individual text element transformation');
+        const individualTextElements = this.filterIndividualTextElements(detectedElementsArray);
+        
+        console.log(`🎯 Found ${individualTextElements.length} individual text elements for React fallback`);
+        
+        for (const elementInfo of individualTextElements) {
+            try {
+                console.log(`🔄 Transforming ${elementInfo.tagName} (${elementInfo.originalText.length} chars): "${elementInfo.originalText.substring(0, 40)}..."`);
+                await this.transformer.transformElement(elementInfo, transformData);
+                transformedCount++;
+                await this.delay(150); // Small delay for React rendering
+            } catch (error) {
+                console.warn(`⚠️ Individual element transformation failed:`, error);
+            }
+        }
+        
+        console.log(`🔥 React Site Fallback Complete: ${transformedCount} additional elements transformed`);
+        console.log(`📊 Total after React fallback: ${this.transformer.getState().transformedCount} elements`);
+    }
+
+    // Find SMART brand elements (avoid massive container elements)
+    findSmartBrandElements(detectedElementsArray) {
+        const brandCandidates = [];
+        
+        for (const elementInfo of detectedElementsArray) {
+            const text = elementInfo.originalText.trim();
+            const element = elementInfo.element;
+            
+            // STRICT criteria for brand elements
+            const isSmartBrandCandidate = (
+                // Only short, focused brand-like text (not entire page sections!)
+                text.length >= 3 && text.length <= 50 &&
+                // Must be heading or have brand-like characteristics
+                (
+                    elementInfo.tagName.match(/^h[1-3]$/) || // H1, H2, H3 only
+                    (text.match(/^[A-Z][a-zA-Z]*$/) && text.length <= 20) || // Single capitalized word
+                    elementInfo.isBrandElement // Explicitly marked as brand
+                ) &&
+                // Must NOT be a container with many children
+                !this.isContainerElement(element) &&
+                // Must be near top of page
+                this.isNearTop(element)
+            );
+            
+            if (isSmartBrandCandidate) {
+                brandCandidates.push({
+                    element: element,
+                    text: text,
+                    confidence: this.calculateBrandConfidence(elementInfo, text)
+                });
+                console.log(`🏷️ Smart brand candidate: "${text}" (${elementInfo.tagName})`);
+            }
+        }
+        
+        // Sort by confidence and return top candidates
+        return brandCandidates
+            .sort((a, b) => b.confidence - a.confidence)
+            .slice(0, 3); // Top 3 brand candidates
+    }
+    
+    // Filter to get INDIVIDUAL text elements (not containers)
+    filterIndividualTextElements(detectedElementsArray) {
+        return detectedElementsArray
+            .filter(elementInfo => {
+                const text = elementInfo.originalText.trim();
+                const element = elementInfo.element;
+                
+                // Skip if already transformed
+                if (this.transformer.transformedContent.has(element)) return false;
+                
+                // Only individual text elements
+                return (
+                    // Reasonable text length (not entire page sections)
+                    text.length >= 10 && text.length <= 300 &&
+                    
+                    // Prefer semantic HTML elements
+                    (
+                        elementInfo.tagName.match(/^h[1-6]$/) || // Headings
+                        elementInfo.tagName === 'p' ||           // Paragraphs
+                        elementInfo.tagName === 'span' ||        // Spans
+                        elementInfo.tagName === 'li'             // List items
+                    ) &&
+                    
+                    // Must NOT be a container with many children
+                    !this.isContainerElement(element) &&
+                    
+                    // Must have reasonable word count (not too long)
+                    this.getWordCount(text) >= 2 && this.getWordCount(text) <= 40 &&
+                    
+                    // Must be visible
+                    this.isElementVisible(element)
+                );
+            })
+            .sort((a, b) => {
+                // Prioritize by element type and length
+                const typeScore = this.getElementTypeScore(a.tagName) - this.getElementTypeScore(b.tagName);
+                if (typeScore !== 0) return typeScore;
+                
+                // Then by word count (prefer shorter, more focused text)
+                return this.getWordCount(a.originalText) - this.getWordCount(b.originalText);
+            })
+            .slice(0, 15); // Limit to top 15 individual elements
+    }
+    
+    // Check if element is a container (has many text children)
+    isContainerElement(element) {
+        try {
+            // Count direct text content vs child element content
+            const directText = this.getDirectTextLength(element);
+            const totalText = element.textContent.length;
+            
+            // If most content comes from children, it's a container
+            const directTextRatio = directText / totalText;
+            
+            // Also check number of child elements
+            const childElements = element.children.length;
+            
+            // Container indicators
+            const isContainer = (
+                directTextRatio < 0.5 ||  // Most text comes from children
+                childElements > 3 ||      // Has many child elements
+                totalText > 500           // Very long text (likely container)
+            );
+            
+            if (isContainer) {
+                console.log(`🚫 Skipping container element: ${element.tagName} (${totalText} chars, ${childElements} children, ${Math.round(directTextRatio * 100)}% direct text)`);
+            }
+            
+            return isContainer;
+        } catch (error) {
+            return false;
+        }
+    }
+    
+    // Get direct text length (not from children)
+    getDirectTextLength(element) {
+        let directTextLength = 0;
+        for (const node of element.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                directTextLength += node.textContent.trim().length;
+            }
+        }
+        return directTextLength;
+    }
+    
+    // Get word count
+    getWordCount(text) {
+        return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+    }
+    
+    // Get element type score for prioritization
+    getElementTypeScore(tagName) {
+        const scores = {
+            'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4, 'h5': 5, 'h6': 6,
+            'p': 7, 'span': 8, 'li': 9, 'div': 10
+        };
+        return scores[tagName] || 10;
+    }
+
+    // Calculate confidence that an element is a brand
+    calculateBrandConfidence(elementInfo, text) {
+        let confidence = 0;
+        
+        // Heading elements get higher confidence
+        if (elementInfo.tagName.match(/^h[1-3]$/)) confidence += 5;
+        
+        // Elements near top of page get higher confidence
+        if (this.isNearTop(elementInfo.element)) confidence += 3;
+        
+        // Short, capitalized text gets higher confidence
+        if (text.length <= 20 && /^[A-Z]/.test(text)) confidence += 3;
+        
+        // Single words that look like brand names
+        if (!text.includes(' ') && text.length >= 4 && text.length <= 15) confidence += 2;
+        
+        // Already marked as brand element
+        if (elementInfo.isBrandElement) confidence += 10;
+        
+        return confidence;
+    }
+    
+    // Check if element is near the top of the page
+    isNearTop(element) {
+        try {
+            const rect = element.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const elementTop = rect.top + scrollTop;
+            
+            // Consider "near top" as first 500px of page
+            return elementTop < 500;
+        } catch (error) {
+            return false;
+        }
     }
 }
 

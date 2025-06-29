@@ -126,14 +126,17 @@ Complete the Site Switcher Chrome extension development and prepare it for initi
 4. ✅ Fix length matching and semantic replacement (COMPLETED - Major overhaul)
 5. ✅ Build visual analysis system with GPT-4o Vision (COMPLETED - Revolutionary upgrade)
 6. ✅ **Fix re-editing problem** (COMPLETED - Disabled remaining transformations phase)
-7. **Test the re-editing fix** - Verify first round transformations are preserved
-8. **Test GPT-4o Vision analysis with real OpenAI API key** - Critical milestone
-9. **Verify comprehensive page transformation** (brand headers, button preservation, full sections)
-10. **Test screenshot capture system** on various website layouts
-11. **Test fallback system** when GPT-4o Vision fails
-12. Test regenerate and reset functionality with new system
-13. Document successful transformation examples with before/after comparisons
-14. Performance testing with large, complex websites
+7. ✅ **Fix React site compatibility** (COMPLETED - Added React Site Fallback system)
+7.5. ✅ **Fix React layout destruction** (COMPLETED - Added smart container detection and length validation)
+8. **Test React layout protection** - Verify React sites transform individual elements without destroying layouts (CRITICAL PRIORITY #1)
+9. **Test the re-editing fix** - Verify first round transformations are preserved
+10. **Test GPT-4o Vision analysis with real OpenAI API key** - Critical milestone
+11. **Verify comprehensive page transformation** (brand headers, button preservation, full sections)
+12. **Test screenshot capture system** on various website layouts
+13. **Test fallback system** when GPT-4o Vision fails
+14. Test regenerate and reset functionality with new system
+15. Document successful transformation examples with before/after comparisons
+16. Performance testing with large, complex websites
 
 #### Recent Issues Fixed (Based on User Feedback):
 - ❌ **Problem**: Replacements were still too long despite length constraints
@@ -147,6 +150,14 @@ Complete the Site Switcher Chrome extension development and prepare it for initi
 - ✅ **NEW SOLUTION**: Disabled the "remaining transformations" phase that was causing re-editing
 - ✅ **NEW SOLUTION**: Added stronger protection against re-transformation of already processed elements
 - ✅ **NEW SOLUTION**: Trust the excellent first-round implementation steps (brand replacement, button handling, section transformations)
+- ❌ **NEWEST PROBLEM**: Extension works great on traditional HTML sites but fails on React sites (only transforms 3 buttons, ignores 59 detected elements)
+- ✅ **NEWEST SOLUTION**: Added React Site Fallback system that detects when semantic targeting fails
+- ✅ **NEWEST SOLUTION**: Flexible brand replacement that uses pattern matching instead of exact text matching for React components
+- ✅ **NEWEST SOLUTION**: Direct priority element transformation that bypasses semantic selectors for React sites with dynamic class names
+- ❌ **CRITICAL LAYOUT PROBLEM**: React fallback was destroying page layouts by replacing massive container DIVs (500+ chars) with tiny phrases (2-3 words)
+- ✅ **CRITICAL LAYOUT SOLUTION**: Added smart element filtering to avoid container elements and target individual text elements only
+- ✅ **CRITICAL LAYOUT SOLUTION**: Strict length validation (10-300 chars) and container detection to prevent layout destruction
+- ✅ **CRITICAL LAYOUT SOLUTION**: Prioritize semantic HTML elements (H1-H6, P, SPAN, LI) over generic containers (DIV)
 
 ### Success Criteria
 
