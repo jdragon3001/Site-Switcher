@@ -10,14 +10,11 @@ class ContentTransformer {
         this.observer = null;
         this.observerPaused = false;
         this.currentTransformData = null;
-        this.isActivelyTransforming = false;
     }
 
     // Transform page content with semantic analysis first
     async transformPage(transformData, detectedElements) {
         console.log('🧠 Starting semantic analysis and transformation...');
-        
-        this.disableObserverDuringTransformation();
         
         this.currentTransformData = transformData;
         this.saveOriginalContent(detectedElements);
@@ -33,15 +30,13 @@ class ContentTransformer {
             await this.applyIntelligentReplacements(detectedElements, transformData);
             
             this.isTransformed = true;
-            
-            this.enableObserverAfterTransformation();
+            this.setupDynamicContentHandling();
             
             console.log('✅ Page transformation completed');
             return { success: true, transformedCount: this.transformedContent.size };
             
         } catch (error) {
             console.error('❌ Transformation error:', error);
-            this.enableObserverAfterTransformation();
             await this.resetPage();
             throw error;
         }
@@ -373,6 +368,12 @@ Generate ONLY the replacement text, no explanation:`;
 
     // Transform individual element (backward compatibility method)
     async transformElement(elementInfo, transformData) {
+        // 🛡️ CRITICAL: Prevent re-transformation of already processed elements
+        if (this.transformedContent.has(elementInfo.element)) {
+            console.log(`⏭️ Skipping already transformed element: "${elementInfo.originalText.substring(0, 30)}..."`);
+            return; // Exit early - don't re-transform!
+        }
+
         try {
             // Use adaptive replacement for better results
             const adaptivePrompt = this.buildAdaptivePrompt(elementInfo, {
@@ -407,7 +408,8 @@ Generate ONLY the replacement text, no explanation:`;
 
     // Apply transformation to element
     applyTransformation(element, newContent) {
-        // Observer is already disabled at batch level - no need to pause per element
+        // CRITICAL: Temporarily disable observer to prevent detecting our own changes
+        this.pauseObserver();
         
         // Clean the content to remove quotes and extra formatting
         const cleanContent = this.cleanGeneratedContent(newContent);
@@ -425,14 +427,15 @@ Generate ONLY the replacement text, no explanation:`;
 
         // Mark element as transformed to prevent re-processing
         element.setAttribute('data-site-switcher-transformed', 'true');
-        element.setAttribute('data-transformation-timestamp', Date.now().toString());
 
-        // Add visual indicator (without affecting observer)
+        // Add visual indicator
         element.style.transition = 'background-color 0.3s ease';
         element.style.backgroundColor = '#fff3cd';
         
         setTimeout(() => {
             element.style.backgroundColor = '';
+            // Resume observer after our changes are complete
+            this.resumeObserver();
         }, 1000);
     }
 
@@ -504,8 +507,8 @@ Generate ONLY the replacement text, no explanation:`;
 
         console.log('🔄 Regenerating content...');
         
-        // Disable observer during regeneration
-        this.disableObserverDuringTransformation();
+        // Pause observer during regeneration
+        this.pauseObserver();
         
         // Clear current transformations
         this.transformedContent.clear();
@@ -515,13 +518,15 @@ Generate ONLY the replacement text, no explanation:`;
             if (element && element.parentNode) {
                 element.innerHTML = originalInfo.html;
                 element.removeAttribute('data-site-switcher-transformed');
-                element.removeAttribute('data-transformation-timestamp');
             }
         });
         
         // Re-run the entire transformation process
         const detectedElements = Array.from(this.originalContent.values()).map(info => info.info);
         await this.transformPage(this.currentTransformData, detectedElements);
+        
+        // Resume observer
+        this.resumeObserver();
         
         console.log('✅ Content regeneration completed');
         return { success: true };
@@ -531,21 +536,21 @@ Generate ONLY the replacement text, no explanation:`;
     async resetPage() {
         console.log('🔄 Resetting page to original content...');
         
-        // Disable observer during reset
-        this.disableObserverDuringTransformation();
+        // Pause observer during reset
+        this.pauseObserver();
         
         // Clear transformation markers and restore original content
         this.originalContent.forEach((originalInfo, element) => {
             if (element && element.parentNode) {
                 element.innerHTML = originalInfo.html;
                 element.removeAttribute('data-site-switcher-transformed');
-                element.removeAttribute('data-transformation-timestamp');
             }
         });
         
         this.transformedContent.clear();
         this.semanticAnalysis = null;
         this.isTransformed = false;
+        this.observerPaused = false;
         this.currentTransformData = null;
         
         this.disconnectObserver();
@@ -569,53 +574,32 @@ Generate ONLY the replacement text, no explanation:`;
             subtree: true,
             characterData: false
         });
-        
-        console.log('🔍 Dynamic content observer initialized');
     }
 
-    // Handle dynamic content changes - WITH BETTER FILTERING
+    // Handle dynamic content changes
     async handleDynamicChanges(mutations) {
         if (!this.isTransformed || !this.currentTransformData) return;
         
-        // CRITICAL: Never process during active transformations
-        if (this.isActivelyTransforming) {
-            console.log('⏭️ Skipping mutation handling - transformation in progress');
-            return;
-        }
-        
-        // Skip processing if observer is paused 
+        // Skip processing if observer is paused (we're making our own changes)
         if (this.observerPaused) {
             console.log('⏭️ Skipping mutation handling - observer paused');
             return;
         }
 
         let hasNewContent = false;
-        let candidateElements = [];
         
         for (const mutation of mutations) {
             if (mutation.type === 'childList') {
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
-                        // ENHANCED FILTERING: Only process truly new elements
-                        const isOurOwnTransformation = this.isOurOwnTransformation(node);
-                        const hasRecentTransformations = this.hasRecentTransformations(node);
-                        
-                        if (!isOurOwnTransformation && !hasRecentTransformations) {
-                            candidateElements.push(node);
-                        } else {
-                            console.log('⏭️ Ignoring our own transformation or recent change');
+                        // Check if this is actually new content vs our own changes
+                        const hasTransformedElements = node.querySelectorAll('[data-site-switcher-transformed]').length > 0;
+                        if (!hasTransformedElements) {
+                            await this.handleNewElement(node);
+                            hasNewContent = true;
                         }
                     }
                 }
-            }
-        }
-        
-        // Process truly new elements if any
-        if (candidateElements.length > 0) {
-            console.log(`🔄 Found ${candidateElements.length} candidate new elements`);
-            for (const element of candidateElements) {
-                await this.handleNewElement(element);
-                hasNewContent = true;
             }
         }
         
@@ -624,38 +608,8 @@ Generate ONLY the replacement text, no explanation:`;
         }
     }
 
-    // Check if a node contains our own transformations
-    isOurOwnTransformation(node) {
-        // Check if node itself or any child has our transformation markers
-        if (node.hasAttribute && node.hasAttribute('data-site-switcher-transformed')) {
-            return true;
-        }
-        
-        const transformedElements = node.querySelectorAll ? node.querySelectorAll('[data-site-switcher-transformed]') : [];
-        return transformedElements.length > 0;
-    }
-
-    // Check if node has elements with recent transformation timestamps
-    hasRecentTransformations(node) {
-        if (!node.querySelectorAll) return false;
-        
-        const recentThreshold = Date.now() - 5000; // 5 seconds
-        const timestampedElements = node.querySelectorAll('[data-transformation-timestamp]');
-        
-        for (const element of timestampedElements) {
-            const timestamp = parseInt(element.getAttribute('data-transformation-timestamp'));
-            if (timestamp > recentThreshold) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
     // Handle newly added elements
     async handleNewElement(element) {
-        console.log('🆕 Processing potentially new element for transformation');
-        
         const detector = new ContentDetector();
         const newElements = detector.detectTextElements();
         
@@ -669,54 +623,27 @@ Generate ONLY the replacement text, no explanation:`;
 
         if (elementsToTransform.length > 0) {
             console.log(`🔄 Found ${elementsToTransform.length} new dynamic elements to transform`);
-            
-            // Temporarily disable observer for this processing
-            this.disableObserverDuringTransformation();
-            
             try {
                 // Use existing semantic analysis or create new one
                 await this.applyIntelligentReplacements(elementsToTransform, this.currentTransformData);
             } catch (error) {
                 console.warn('⚠️ Error transforming dynamic content:', error);
-            } finally {
-                // Re-enable observer
-                this.enableObserverAfterTransformation();
             }
         }
     }
     
-    // Disable observer during transformation to prevent self-detection
-    disableObserverDuringTransformation() {
-        this.isActivelyTransforming = true;
-        this.observerPaused = true;
-        console.log('🛑 Observer DISABLED for transformation batch');
-    }
-    
-    // Re-enable observer after transformation completes
-    enableObserverAfterTransformation() {
-        // Add delay to ensure all DOM changes are complete
-        setTimeout(() => {
-            this.isActivelyTransforming = false;
-            this.observerPaused = false;
-            
-            // Set up observer if it doesn't exist
-            if (!this.observer && this.isTransformed) {
-                this.setupDynamicContentHandling();
-            }
-            
-            console.log('✅ Observer ENABLED after transformation complete');
-        }, 2000); // Longer delay to ensure all changes are complete
-    }
-
-    // Legacy methods - keep for backward compatibility but remove individual pausing
+    // Pause observer to prevent detecting our own changes
     pauseObserver() {
-        // This method is now handled at batch level
-        console.log('⏸️ Individual pause (handled at batch level)');
+        this.observerPaused = true;
+        console.log('⏸️ Observer paused');
     }
     
+    // Resume observer after our changes are complete
     resumeObserver() {
-        // This method is now handled at batch level
-        console.log('▶️ Individual resume (handled at batch level)');
+        setTimeout(() => {
+            this.observerPaused = false;
+            console.log('▶️ Observer resumed');
+        }, 100); // Small delay to ensure DOM changes are complete
     }
 
     // Disconnect observer
@@ -724,11 +651,7 @@ Generate ONLY the replacement text, no explanation:`;
         if (this.observer) {
             this.observer.disconnect();
             this.observer = null;
-            console.log('🔌 Observer disconnected');
         }
-        
-        this.isActivelyTransforming = false;
-        this.observerPaused = false;
     }
 
     // Get transformation state
