@@ -94,7 +94,7 @@ RESPONSE FORMAT (JSON only):
                     messages: [
                                             {
                         role: 'system',
-                        content: 'You are a web content analyst. Analyze website content and provide structured JSON responses for intelligent content replacement. Be concise and precise. Never include quotes or quotation marks in your output.'
+                        content: 'You are a web content analyst. Analyze website content and provide structured JSON responses for intelligent content replacement. Be concise and precise. CRITICAL: Never include quotes, quotation marks, or any wrapper characters in your output. Return clean text only.'
                     },
                         {
                             role: 'user',
@@ -261,7 +261,7 @@ Generate ONLY the replacement text, no explanation:`;
                 messages: [
                     {
                         role: 'system',
-                        content: 'You are a precise copywriter. Generate exact length replacements. Be concise and respect word limits strictly. Output only the replacement text without quotes, formatting, or explanations.'
+                        content: 'You are a precise copywriter. Generate exact length replacements. Be concise and respect word limits strictly. CRITICAL: Output only the replacement text without quotes, quotation marks, formatting, explanations, or any wrapper characters. Return clean, unquoted text only.'
                     },
                     {
                         role: 'user',
@@ -447,11 +447,18 @@ Generate ONLY the replacement text, no explanation:`;
 
         let cleaned = content.trim();
         
-        // Remove surrounding quotes (single or double)
-        if ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
-            (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
-            cleaned = cleaned.slice(1, -1).trim();
+        // 🔥 AGGRESSIVE quote removal - remove ALL types of quotes
+        // Remove surrounding quotes (single or double) - multiple times if nested
+        for (let i = 0; i < 3; i++) {
+            if ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+                (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+                cleaned = cleaned.slice(1, -1).trim();
+            }
         }
+        
+        // Remove any remaining quotes in the content
+        cleaned = cleaned.replace(/["""''']/g, ''); // Smart quotes and regular quotes
+        cleaned = cleaned.replace(/^["']|["']$/g, ''); // Start/end quotes
         
         // Remove multiple spaces
         cleaned = cleaned.replace(/\s+/g, ' ');
@@ -463,6 +470,9 @@ Generate ONLY the replacement text, no explanation:`;
         
         // Remove HTML-like tags if they appear
         cleaned = cleaned.replace(/<[^>]*>/g, '');
+        
+        // Final cleanup - remove any wrapper punctuation that shouldn't be there
+        cleaned = cleaned.replace(/^[`~]+|[`~]+$/g, ''); // Backticks or tildes
         
         return cleaned.trim();
     }
