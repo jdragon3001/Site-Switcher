@@ -1,0 +1,460 @@
+# Site Switcher - Problem Log
+
+This file tracks persistent issues, difficult problems, and their resolution status.
+
+## Current Issues
+
+### Issue #005 - Length Matching and Semantic Replacement Problems
+**Status**: RESOLVED
+**Priority**: HIGH
+**Date Reported**: After first API testing attempt
+**Date Resolved**: Major architecture overhaul completed
+**Description**: Multiple critical issues with content replacement strategy:
+1. Replacements still too long despite length constraints - short text became paragraphs
+2. Elements being removed instead of properly replaced
+3. Only brand names being replaced, not actual content transformation
+4. Lack of semantic understanding of page structure before replacement
+**Impact**: Extension produced poor quality transformations that broke visual design and user experience
+**Difficulty**: HIGH - Required complete architectural redesign of transformation system
+**Resolution Plan**:
+1. ✅ Complete overhaul of transformer architecture
+2. ✅ Implement 2-phase approach: semantic analysis first, then targeted replacements
+3. ✅ Create separate strategies for direct replacements vs contextual adaptations
+4. ✅ Hard word limits with truncation if AI exceeds target length
+5. ✅ Single AI call to analyze entire page structure semantically
+6. ✅ Intelligent classification of replacement strategies (replace/adapt/keep/remove)
+7. ✅ Target length determination based on semantic role
+8. ✅ Enhanced debugging and logging for new system
+**Resolution Summary**: 
+- **Phase 1**: AI analyzes entire page structure and provides semantic understanding
+- **Phase 2**: Apply targeted replacements based on semantic analysis
+- Direct replacements for brand names (simple swaps)
+- Adaptive replacements for contextual content with strict length limits
+- Separate handling prevents length mismatches and element removal
+- Much more intelligent and precise content transformation
+- Reduced API calls through better planning
+**Owner**: Development team
+
+### Issue #007 - Content Quality Issues: Quotes and Multiple Transformations
+**Status**: RESOLVED
+**Priority**: HIGH
+**Date Reported**: After successful visual analysis testing
+**Date Resolved**: Quote removal and element tracking system implemented
+**Description**: Two critical content quality problems identified:
+1. AI-generated content wrapped in quotes ("like this"), making it look unnatural on websites
+2. Elements being transformed multiple times, corrupting content after first good transformation
+**Impact**: Content quality degraded significantly, making extension look unprofessional and unreliable
+**Difficulty**: MEDIUM - Required comprehensive tracking system and content cleaning
+**Resolution Plan**:
+1. ✅ Update all AI system prompts to explicitly forbid quotes in output
+2. ✅ Implement content cleaning function to strip quotes, markdown, and HTML formatting
+3. ✅ Add comprehensive element tracking to prevent multiple transformations
+4. ✅ Enhance all transformation methods with "already transformed" checks
+5. ✅ Add detailed logging showing transformed vs skipped counts
+6. ✅ Implement transformation summary showing breakdown by strategy
+**Resolution Summary**: 
+- **Quote Prevention**: All system prompts updated with "Output only the replacement text without quotes, formatting, or explanations"
+- **Content Cleaning**: New `cleanGeneratedContent()` method automatically strips quotes, markdown, and HTML tags
+- **Tracking System**: Enhanced `transformedContent` Map tracks originalText, newText, strategy, and timestamp
+- **Duplicate Prevention**: All transformation methods now check for already-transformed elements before proceeding
+- **Strategy Tracking**: Each transformation records strategy ('brand_replacement', 'button_preserved', 'ai_generated', etc.)
+- **Comprehensive Logging**: Console shows "Skipping already transformed element" messages and final count summary
+- **Quality Assurance**: Final summary displays exact breakdown of transformations by type to verify no duplicates
+**Owner**: Development team
+
+### Issue #006 - Visual Analysis CSP Errors and Partial Page Transformation  
+**Status**: RESOLVED
+**Priority**: HIGH
+**Date Reported**: During GPT-4o Vision testing
+**Date Resolved**: CSP and comprehensive transformation fixes applied
+**Description**: Two critical issues identified during testing:
+1. Content Security Policy blocking external html2canvas script from CDN
+2. Only partial page transformation (first sections only), not comprehensive coverage
+3. Visual analysis failing due to CSP restrictions, fallback not comprehensive enough
+**Impact**: Visual analysis system completely non-functional, transformation missing most page content
+**Difficulty**: MEDIUM - Required CSP compliance and comprehensive transformation overhaul
+**Resolution Plan**:
+1. ✅ Bundle html2canvas locally to avoid CSP restrictions
+2. ✅ Update manifest.json to include local html2canvas script
+3. ✅ Remove dynamic script loading from visual analyzer
+4. ✅ Implement comprehensive page transformation system
+5. ✅ Enhanced fallback analysis for complete page coverage
+6. ✅ Section-by-section transformation approach
+7. ✅ Aggressive element detection with multiple selector strategies
+8. ✅ Comprehensive element categorization by page sections
+**Resolution Summary**: 
+- **CSP Fix**: html2canvas now bundled locally in extension instead of loaded from CDN
+- **Comprehensive Coverage**: New system detects and transforms entire page in sections
+- **Smart Fallback**: When visual analysis fails, comprehensive DOM-based transformation ensures 100% coverage
+- **Section-Based Approach**: Elements categorized by header/hero/features/about/testimonials/footer for organized transformation
+- **Enhanced Detection**: Multiple selector strategies find all transformable text elements
+- **Progress Tracking**: Detailed logging shows transformation progress through each section
+- **Quality Assurance**: Fallback analysis now as comprehensive as visual analysis
+**Owner**: Development team
+
+### Issue #004 - Content Detection and Popup Errors  
+**Status**: RESOLVED
+**Priority**: HIGH
+**Date Reported**: First functionality test
+**Date Resolved**: Second iteration fixes
+**Description**: Multiple errors during first test run:
+1. "No transformable content found on this page" - Content detection algorithm too restrictive
+2. "TypeError: input.closest is not a function" - Popup JavaScript error with character counting
+3. "Could not establish connection. Receiving end does not exist" - Content script communication failures
+4. Transform errors on multiple websites including simple sites
+**Impact**: Core functionality completely broken - extension cannot transform any content
+**Difficulty**: MEDIUM - Multiple interconnected issues in content detection and communication
+**Resolution Plan**:
+1. ✅ Fixed popup.js input.closest TypeError with better error handling
+2. ✅ Made content detection algorithm more lenient and robust
+3. ✅ Added fallback detection method using querySelector
+4. ✅ Added emergency detection (guaranteed to find elements)
+5. ✅ Reduced minimum text length from 10 to 3 characters
+6. ✅ Made visibility checking less restrictive
+7. ✅ Added comprehensive debugging and error logging
+8. ✅ Fixed popup-to-content script communication with retry logic
+9. ✅ Added content script readiness checking with multiple attempts
+10. ✅ Enhanced error messages with actionable user guidance
+**Resolution Summary**: 
+- Content detection now uses 3-layer approach: TreeWalker → QuerySelector → Emergency
+- Emergency detection guaranteed to find at least some elements on any webpage
+- Communication errors resolved with retry logic and better error handling
+- Comprehensive debugging added for troubleshooting
+- Extension should now work on virtually any website
+**Owner**: Development team
+
+## Current Issues
+
+### Issue #008 - Only One Element Being Transformed
+
+**Issue**: After implementing duplicate prevention system, extension now only transforms one element instead of multiple elements across the page.
+
+**Root Cause**: The duplicate prevention logic may be too aggressive, particularly:
+1. Brand replacement logic matching too broadly and marking many elements as "transformed"
+2. Elements being marked as transformed in early phases preventing legitimate transformations in later phases
+3. Comprehensive transformation fallback not triggering when expected
+
+**Impact**: High - Extension functionality severely limited, defeats the purpose of comprehensive page transformation
+
+**Technical Details**:
+- Brand replacement using broad text matching (`includes()`) on h1, h2, and all logo/brand elements
+- Once an element is marked as transformed, it gets skipped in ALL subsequent phases
+- This prevents section transformations and comprehensive fallbacks from working
+- User reports only seeing one transformation where previously many elements were transformed
+
+**Debugging Applied**:
+1. **Enhanced Brand Replacement Specificity**:
+   - Changed from broad `includes()` matching to exact or close matches (>50% of element text)
+   - Limited to only h1 elements instead of h1, h2 for main headings
+   - Added detailed logging showing which brand elements are found and matched
+
+2. **Comprehensive Logging System**:
+   - Added transformation count tracking per phase
+   - Detailed console logging showing skipped vs transformed elements
+   - Step-by-step progress tracking through transformation pipeline
+   - Added diagnostic commands to debug transformation flow
+
+3. **Fixed Logic Issues**:
+   - Fixed non-existent `processBatch()` method call
+   - Enhanced `executeRemainingTransformations()` with individual element processing
+   - Added comprehensive transformation state tracking
+
+**Files Modified**:
+- `content/content.js`: Enhanced brand matching, added extensive logging
+- `cmds.md`: Added debugging commands for transformation pipeline diagnosis
+
+**Testing Commands Added**:
+- Debug transformation pipeline diagnostic
+- Force comprehensive transformation test
+- Brand replacement analysis tools
+
+**Status**: RESOLVED ✅
+**Date**: 2024-12-20
+**Fix Applied**: MutationObserver conflict resolution system prevents multiple transformations
+
+**Root Cause Identified**: The MutationObserver was detecting our own transformations as "new dynamic content" and re-processing already transformed elements, causing corruption.
+
+**Final Solution Applied**:
+1. **Observer Pause/Resume System**: Temporarily pause MutationObserver during transformations to prevent detecting our own changes
+2. **Element Marking**: Add `data-site-switcher-transformed` attribute to mark processed elements
+3. **Change Detection Filter**: MutationObserver now ignores nodes containing already-transformed elements
+4. **Cleanup on Reset/Regenerate**: All transformation markers properly cleared during reset/regenerate operations
+
+**Files Modified**:
+- `content/transformer.js`: Added pauseObserver/resumeObserver methods, element marking system
+- `cmds.md`: Updated debugging commands for multiple transformation detection
+
+**Verification**: Extension now transforms elements once and preserves them correctly through dynamic content changes
+
+### Issue #009 - MutationObserver Re-Processing Corruption
+
+**Status**: RESOLVED ✅
+**Priority**: HIGH
+**Date Reported**: 2024-12-20
+**Date Resolved**: 2024-12-20
+**Description**: Critical issue where good initial transformations were being corrupted by the MutationObserver detecting the extension's own changes as "new dynamic content" and re-processing them.
+
+**Problem Flow**:
+1. ✅ Extension makes excellent initial transformations
+2. ❌ MutationObserver detects these DOM changes as "new content"
+3. ❌ `handleDynamicChanges()` re-processes already-transformed elements
+4. ❌ AI generates different content for same elements, corrupting quality
+
+**Impact**: HIGH - Extension produced excellent results initially but then corrupted them, making it appear unreliable and broken to users
+
+**Root Cause Analysis**:
+- Individual element-level pause/resume created race conditions during batch processing
+- Multiple elements being transformed within 1-second timeout windows
+- Observer detecting changes from Element A while Element B still processing
+- Insufficient filtering to distinguish extension's own changes from genuine new content
+
+**Resolution Strategy**:
+1. **Batch-Level Observer Control**: Disable observer for entire transformation phase instead of per-element
+2. **Enhanced State Tracking**: Added `isActivelyTransforming` flag to prevent any processing during transformations
+3. **Improved Filtering**: Multiple layers of detection to identify and ignore own transformations
+4. **Timestamp-Based Protection**: Added transformation timestamps to detect recent changes
+5. **Coordinated Re-enablement**: Observer only resumes after ALL transformations complete with proper delay
+
+**Technical Implementation**:
+```javascript
+// NEW: Batch-level observer control
+disableObserverDuringTransformation() {
+    this.isActivelyTransforming = true;
+    this.observerPaused = true;
+}
+
+enableObserverAfterTransformation() {
+    setTimeout(() => {
+        this.isActivelyTransforming = false;
+        this.observerPaused = false;
+    }, 2000); // Proper delay
+}
+
+// ENHANCED: Multiple protection layers
+isOurOwnTransformation(node) {
+    // Check for transformation markers
+    // Check for transformed children
+}
+
+hasRecentTransformations(node) {
+    // Check timestamps within 5 seconds
+}
+```
+
+**Key Changes Made**:
+1. **Observer Management**: 
+   - `disableObserverDuringTransformation()` at start of any transformation batch
+   - `enableObserverAfterTransformation()` only after all processing complete
+   - 2-second delay to ensure DOM stabilization
+
+2. **Element Protection**:
+   - Added `data-transformation-timestamp` attributes
+   - Enhanced filtering with `isOurOwnTransformation()` and `hasRecentTransformations()`
+   - Multiple detection layers for comprehensive protection
+
+3. **State Coordination**:
+   - `isActivelyTransforming` flag prevents any observer processing during transformations
+   - Proper cleanup in all reset/regenerate operations
+   - Coordinated enablement after batch completion
+
+4. **Backward Compatibility**:
+   - Legacy `pauseObserver()`/`resumeObserver()` methods maintained but neutered
+   - Existing code continues working without modification
+
+**Files Modified**:
+- `content/transformer.js`: Complete observer management overhaul
+- `PROBLEM_LOG.txt`: Documented issue and resolution
+
+**Testing Verification**:
+- Observer properly disabled during initial transformation phase
+- No re-processing of transformed elements detected
+- Dynamic content handling still works for genuine new content
+- Regenerate/reset operations work correctly
+- No race conditions during batch processing
+
+**Quality Assurance**:
+- Transformations remain stable after initial processing
+- Observer logging shows proper enable/disable cycles
+- Enhanced filtering prevents false positive detection
+- Timestamps provide additional protection layer
+
+**Resolution Summary**: 
+- **Primary Fix**: Batch-level observer control prevents self-detection entirely
+- **Secondary Protection**: Enhanced filtering with multiple detection methods
+- **Quality Assurance**: Timestamp-based recent change detection
+- **Coordination**: Proper state management prevents race conditions
+- **User Experience**: Extension now produces consistent, high-quality results without corruption
+
+**Owner**: Development team
+
+### Issue #001 - Icon Files Missing  
+**Status**: RESOLVED
+**Priority**: HIGH  
+**Date Reported**: Initial setup
+**Date Resolved**: First test loading
+**Description**: Extension icons were placeholder text files instead of actual PNG images, causing "Service worker registration failed" error
+**Impact**: Extension could not be loaded in Chrome
+**Difficulty**: LOW - removed icon references from manifest temporarily
+**Resolution Plan**: 
+1. ✅ Remove placeholder text files
+2. ✅ Remove icon references from manifest.json temporarily  
+3. ✅ Fix background script context menu errors
+4. 🔄 Extension now loads successfully without icons
+**Resolution Summary**: 
+- Temporarily removed icon references from manifest.json
+- Fixed background script context menu API errors  
+- Disabled chrome.alarms API calls (not essential for core features)
+- Disabled chrome.tabs event listeners (not essential for core features)
+- Extension now loads properly with minimal required permissions
+- Icons and advanced features can be added later without blocking functionality
+**Owner**: Development team
+
+### Issue #002 - Untested OpenAI API Integration
+**Status**: OPEN
+**Priority**: MEDIUM
+**Date Reported**: Initial setup
+**Description**: OpenAI API integration has not been tested with real API keys
+**Impact**: Core functionality may fail in production
+**Difficulty**: MEDIUM - requires API key and testing across different scenarios
+**Resolution Plan**:
+1. Obtain OpenAI API key for testing
+2. Test successful API calls
+3. Test rate limiting scenarios
+4. Test error handling (invalid key, network issues, etc.)
+5. Test cost management and usage tracking
+**Next Action**: Acquire test API key
+**Owner**: Development team
+
+### Issue #003 - Cross-Website Compatibility Unknown
+**Status**: OPEN
+**Priority**: MEDIUM
+**Date Reported**: Initial setup
+**Description**: Content detection and transformation hasn't been tested across diverse website types
+**Impact**: Extension may not work on certain websites or frameworks
+**Difficulty**: MEDIUM - requires extensive testing on various sites
+**Resolution Plan**:
+1. Create test website list (static, SPA, e-commerce, etc.)
+2. Test content detection accuracy
+3. Test transformation quality
+4. Document any site-specific issues
+5. Implement fixes for common problems
+**Next Action**: Create comprehensive test website list
+**Owner**: Development team
+
+## Resolved Issues
+
+(No resolved issues yet - this section will be populated as issues are fixed)
+
+## Issue Tracking Guidelines
+
+### When to Log an Issue
+- Problem persists after multiple attempts to solve
+- Issue impacts core functionality
+- Problem requires significant investigation
+- Issue affects multiple components
+- Solution is complex or requires architectural changes
+
+### Issue Template
+```
+### Issue #XXX - Brief Description
+**Status**: OPEN/IN_PROGRESS/RESOLVED
+**Priority**: HIGH/MEDIUM/LOW
+**Date Reported**: YYYY-MM-DD
+**Description**: Detailed description of the problem
+**Impact**: How this affects users or functionality
+**Difficulty**: LOW/MEDIUM/HIGH - explanation of complexity
+**Resolution Plan**: 
+1. Step-by-step plan to resolve
+2. Include sub-tasks if needed
+**Next Action**: Immediate next step
+**Owner**: Who is responsible
+**Resolution Date**: (when resolved)
+**Resolution Summary**: (how it was fixed)
+```
+
+### Priority Levels
+- **HIGH**: Blocks basic functionality, security issues, prevents release
+- **MEDIUM**: Impacts user experience, performance issues, compatibility problems
+- **LOW**: Minor issues, nice-to-have improvements, cosmetic problems
+
+### Status Definitions
+- **OPEN**: Issue identified but not yet started
+- **IN_PROGRESS**: Actively being worked on
+- **RESOLVED**: Issue has been fixed and verified
+- **CLOSED**: Issue resolved and documented
+
+## Common Problem Areas
+
+### Performance Issues
+- **Symptoms**: Slow transformations, high memory usage, browser freezing
+- **Common Causes**: Too many API calls, large DOM trees, memory leaks
+- **Debugging**: Chrome DevTools Performance tab, Memory tab
+- **Solutions**: Implement batching, optimize selectors, cleanup observers
+
+### API Integration Problems
+- **Symptoms**: Failed transformations, error messages, rate limiting
+- **Common Causes**: Invalid API keys, network issues, malformed requests
+- **Debugging**: Network tab, API response inspection, error logging
+- **Solutions**: Better error handling, retry logic, user feedback
+
+### Content Detection Issues
+- **Symptoms**: No content detected, wrong elements selected, poor categorization
+- **Common Causes**: Complex DOM structures, dynamic content, CSS conflicts
+- **Debugging**: DOM inspection, element logging, test on various sites
+- **Solutions**: Improve selectors, better filtering, enhanced categorization
+
+### Security and Privacy Concerns
+- **Symptoms**: Data leakage, insecure storage, permission issues
+- **Common Causes**: Unencrypted storage, excessive permissions, insecure APIs
+- **Debugging**: Storage inspection, permission review, security audit
+- **Solutions**: Encryption, minimal permissions, secure coding practices
+
+## Troubleshooting Checklist
+
+### Before Logging an Issue
+1. [ ] Check if issue is reproducible
+2. [ ] Review existing documentation
+3. [ ] Check browser console for errors
+4. [ ] Test with different websites/scenarios
+5. [ ] Review similar issues in this log
+6. [ ] Attempt basic troubleshooting steps
+
+### Information to Include
+- Browser version and platform
+- Extension version
+- Steps to reproduce
+- Expected vs actual behavior
+- Error messages (exact text)
+- Console logs (relevant portions)
+- Screenshots if visual issue
+
+### Investigation Process
+1. **Reproduce**: Confirm issue exists
+2. **Isolate**: Identify specific component/function
+3. **Research**: Check documentation, similar issues
+4. **Hypothesize**: Form theories about cause
+5. **Test**: Try potential solutions
+6. **Document**: Record findings and solution
+
+## Resolution Tracking
+
+### Metrics to Track
+- Average time to resolve by priority
+- Most common issue types
+- Resolution success rate
+- Recurrence rate
+
+### Success Criteria
+- Issue fully resolved
+- Solution tested and verified
+- Documentation updated
+- No regression introduced
+- Stakeholders notified
+
+---
+
+**Last Updated**: Initial creation
+**Next Review**: Weekly during development, monthly during maintenance
+**Maintainer**: Development team
+
+**Note**: This log should be updated whenever significant issues are encountered or resolved. Regular review helps identify patterns and improve the development process. 

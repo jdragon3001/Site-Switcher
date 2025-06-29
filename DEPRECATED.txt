@@ -1,0 +1,62 @@
+# Site Switcher - Deprecated Code Patterns
+
+This file tracks deprecated code patterns and practices that should be avoided in the Site Switcher extension.
+
+## Deprecated Patterns
+
+### 1. Manifest V2 Patterns
+**Status**: FORBIDDEN
+**Reason**: Chrome is phasing out Manifest V2 support
+**Instead Use**: Manifest V3 patterns
+
+**Deprecated:**
+```javascript
+// Manifest V2 background page
+"background": {
+  "scripts": ["background.js"],
+  "persistent": false
+}
+
+// Manifest V2 browser action
+"browser_action": {
+  "default_popup": "popup.html"
+}
+```
+
+**Use Instead:**
+```javascript
+// Manifest V3 service worker
+"background": {
+  "service_worker": "background/background.js"
+}
+
+// Manifest V3 action
+"action": {
+  "default_popup": "popup/popup.html"
+}
+```
+
+### 2. Synchronous Chrome APIs
+**Status**: DEPRECATED
+**Reason**: Chrome APIs are moving to Promise-based patterns
+**Instead Use**: Async/await with Promise-based APIs
+
+### 3. Direct DOM innerHTML Manipulation
+**Status**: DISCOURAGED
+**Reason**: Security risks and loss of event handlers
+**Instead Use**: Structured text replacement
+
+### 4. Unencrypted API Key Storage
+**Status**: FORBIDDEN
+**Reason**: Security vulnerability
+**Instead Use**: Encrypted storage
+
+### 5. Global Variable Pollution
+**Status**: DISCOURAGED
+**Reason**: Namespace conflicts and memory leaks
+**Instead Use**: Module patterns and proper scoping
+
+---
+
+**Last Updated**: Initial creation
+**Maintainer**: Development team 
